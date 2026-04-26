@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0e141c;
+  --color-error: #ffb4ab;
+  --color-tertiary: #ffb68d;
+  --color-tertiary-fixed: #ffdbc9;
+  --color-outline: #869394;
+  --color-on-primary-fixed: #002022;
+  --color-on-tertiary-fixed: #331200;
+  --color-outline-variant: #3c494a;
+  --color-tertiary-container: #e2844a;
+  --color-surface-container-lowest: #080f17;
+  --color-on-surface: #dde3ef;
+  --color-tertiary-fixed-dim: #ffb68d;
+  --color-primary-container: #00adb5;
+  --color-inverse-surface: #dde3ef;
+  --color-on-secondary-fixed: #171c23;
+  --color-on-tertiary-fixed-variant: #763300;
+  --color-surface-dim: #0e141c;
+  --color-primary-fixed-dim: #55d8e1;
+  --color-primary-fixed: #75f5fd;
+  --color-on-background: #dde3ef;
+  --color-surface-variant: #2f353e;
+  --color-surface-container: #1a2029;
+  --color-surface-tint: #55d8e1;
+  --color-on-secondary-fixed-variant: #42474f;
+  --color-secondary-container: #474c54;
+  --color-primary: #55d8e1;
+  --color-on-secondary: #2c3138;
+  --color-on-primary-fixed-variant: #004f53;
+  --color-surface-bright: #343a43;
+  --color-on-primary: #003739;
+  --color-inverse-primary: #00696e;
+  --color-secondary-fixed: #dee2ed;
+  --color-secondary: #c2c7d0;
+  --color-inverse-on-surface: #2b313a;
+  --color-secondary-fixed-dim: #c2c7d0;
+  --color-on-tertiary: #532200;
+  --color-on-error-container: #ffdad6;
+  --color-on-surface-variant: #bbc9ca;
+  --color-on-error: #690005;
+  --color-on-primary-container: #003a3d;
+  --color-surface-container-low: #161c25;
+  --color-surface-container-highest: #2f353e;
+  --color-on-tertiary-container: #582500;
+  --color-background: #0e141c;
+  --color-on-secondary-container: #b7bcc6;
+  --color-surface-container-high: #242a33;
+  --color-error-container: #93000a;
+  
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-background);
+}
+

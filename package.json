@@ -1,0 +1,40 @@
+{
+    "name": "ProtoFlow",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",
+        "dev:frontend": "vite",
+        "dev:backend": "npm --prefix backend run dev",
+        "build": "npm run build:frontend && npm run build:backend",
+        "build:frontend": "vite build",
+        "build:backend": "npm --prefix backend run build",
+        "start:backend": "npm --prefix backend run start",
+        "tauri:dev": "tauri dev",
+        "tauri:build": "npm run build && tauri build",
+        "arch:build": "npm run build && NO_STRIP=true tauri build",
+        "ci:build": "npm run build && tauri build",
+        "clean": "rm -rf dist backend/dist src-tauri/target"
+    },
+    "dependencies": {
+        "@tailwindcss/vite": "^4.2.4",
+        "@tauri-apps/api": "^2",
+        "@tauri-apps/plugin-opener": "^2",
+        "lucide-react": "^1.8.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "react-router-dom": "^7.14.2",
+        "recharts": "^3.8.1"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2",
+        "@types/react": "^19.1.8",
+        "@types/react-dom": "^19.1.6",
+        "@vitejs/plugin-react": "^4.6.0",
+        "concurrently": "^9.2.1",
+        "tailwindcss": "^4.2.4",
+        "typescript": "~5.8.3",
+        "vite": "^7.0.4"
+    }
+}
