@@ -131,13 +131,13 @@ export class Prober {
         }
 
         return {
-            latencyMs: randomBetween(11, 39),
-            jitterMs: randomBetween(0.5, 13),
-            packetLoss: randomBetween(0.03, 0.20),
-            throughputMbps: randomBetween(299, 2001),
+            latencyMs: randomBetween(12, 40),
+            jitterMs: randomBetween(1, 14),
+            packetLoss: randomBetween(0.01, 0.15),
+            throughputMbps: randomBetween(300, 2000),
             success: true,
             packetsSent: 8,
-            packetsReceived: Math.round(randomBetween(7, 8)),
+            packetsReceived: Math.round(randomBetween(6, 8)),
         };
     }
 }
