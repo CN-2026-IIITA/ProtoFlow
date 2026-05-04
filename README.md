@@ -1,60 +1,178 @@
-# ProtoFlow (Traffic Optimizer)
+# ProtoFlow
 
-ProtoFlow is a dynamic multi-protocol traffic optimizer and smart proxy routing system built as a modern desktop application. It continuously monitors network conditions and dynamically routes real-time traffic across HTTP/2, HTTP/3, and UDP to ensure optimal network performance, minimizing latency and packet loss.
+🚀 Multi-protocol traffic intelligence for modern desktop workflows.
 
-## Key Features
+![GitHub stars](https://img.shields.io/github/stars/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
+![GitHub issues](https://img.shields.io/github/issues/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
+![GitHub license](https://img.shields.io/github/license/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
 
-- **Dynamic Protocol Switching**: Automatically evaluates and switches routing between HTTP/2, HTTP/3, and UDP based on real-time network conditions.
-- **Smart Proxy Router**: A local lightweight proxy layer that handles incoming requests and routes them through the optimal protocol using the decision engine.
-- **Real-Time Network Monitoring**: Uses native C++ addons (N-API) and `quiche-client` to accurately probe network metrics (latency, jitter, packet loss, throughput) without imposing high overhead.
-- **Modern Desktop Dashboard**: A responsive, desktop-first Tauri app built with React, Vite, and Tailwind CSS ("Aether Protocol" design system) providing comprehensive visualization of:
-  - Network Map & Routing paths
-  - System Health & Real-Time Protocol Scoring
-  - Security Logs & Event deduplication
-  - Real-Time Settings & Configuration Configuration
-- **Configurable Settings**: Support for manual protocol overrides, dynamic auto-switching configurations, and simulated network degradation.
+## 🔍 Preview
 
-## Tech Stack
+### 🎬 Workflow Demo
 
-- **Frontend**: React 19, Vite, TailwindCSS (v4), Recharts, Lucide React
-- **Desktop Environment**: Tauri v2
-- **Backend**: Node.js (TypeScript), Express, WebSockets for real-time telemetry
-- **Native Layer**: C++ (node-gyp), quiche-client for low-level network probing
+<!-- dashboard.gif: animated walkthrough of dashboard interactions and workflow -->
 
-## Getting Started
+![ProtoFlow Dashboard Demo](./assets/dashboard.gif)
 
-### Prerequisites
+<p><em>End-to-end interaction flow from monitoring to smart route switching.</em></p>
 
-- Node.js (v18+)
-- Rust & Cargo (for Tauri and quiche-client)
-- C++ build tools (`build-essential`, `cmake`, `clang` etc.)
+---
 
-### Installation
+### 🔬 Protocol Analyzer
 
-1. **Install Dependencies**
-   ```bash
-   npm install
-   cd backend && npm install
-   ```
+<!-- ProtocolAnalyzer.png: analyzer view comparing protocol behavior and routing intelligence -->
 
-2. **Run Development Mode**
-   Starts both the React frontend and the backend API/WebSocket server concurrently.
-   ```bash
-   npm run dev
-   ```
+![ProtoFlow Protocol Analyzer](./assets/ProtocolAnalyzer.png)
 
-3. **Run as Desktop App (Tauri)**
-   ```bash
-   npm run tauri:dev
-   ```
+<p><em>Deep protocol comparison across performance and reliability dimensions.</em></p>
 
-4. **Build for Production**
-   ```bash
-   npm run build
-   npm run tauri:build
-   ```
+---
 
-## Architecture Notes
+### 🧠 System Health Dashboard
 
-- The backend serves as the core decision engine and smart proxy router.
-- Native bindings are used for high-fidelity measurements. See `backend/README.md` for specific instructions on compiling the native addons and enabling real HTTP/3 via Cloudflare's `quiche-client`.
+<!-- SystemHealth.png: main dashboard with protocol status, health cards, and core metrics -->
+
+![ProtoFlow System Health](./assets/SystemHealth.png)
+
+<p><em>Live system status, traffic KPIs, and optimization signals.</em></p>
+
+---
+
+### 🛡️ Event Logs
+
+<!-- EventLogs.png: security and operational event logs for observability -->
+
+![ProtoFlow Event Logs](./assets/EventLogs.png)
+
+<p><em>Operational and security events for transparent observability.</em></p>
+
+### Suggested Asset Ideas
+
+- 🖼️ Dashboard overview screenshot: Include system health cards, active route, and latency chart.
+- 🖼️ Protocol analyzer screenshot: Highlight HTTP/2 vs HTTP/3 vs UDP score comparison.
+- 🎞️ Auto-switch demo GIF: Simulate network degradation and show automatic protocol failover.
+- 🎞️ Security logs demo GIF: Scroll and filter events to showcase observability.
+- 🎞️ Settings workflow GIF: Toggle manual override and update optimization rules in real time.
+
+## ✨ Features
+
+- Intelligent protocol routing across HTTP/2, HTTP/3, and UDP.
+- Live network telemetry with latency, jitter, packet loss, and throughput insights.
+- Desktop-first monitoring dashboard built for rapid decision-making.
+- Real-time event stream with security log tracking and protocol scoring.
+- Configurable switching policies with manual override for controlled experiments.
+- Modular architecture ready for contributors and production hardening.
+
+## ⚙️ Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/CN-2026-IIITA/ProtoFlow.git
+cd ProtoFlow
+```
+
+### 2. Install Root Dependencies
+
+```bash
+npm install
+```
+
+### 3. Install Backend Dependencies
+
+```bash
+cd backend
+npm install
+cd ..
+```
+
+### 4. Verify Prerequisites
+
+- Node.js 18+
+- Rust and Cargo
+- C++ toolchain (build-essential, cmake, clang)
+
+## ▶️ Usage
+
+### Run Web Development Mode
+
+```bash
+npm run dev
+```
+
+### Run Desktop Development Mode (Tauri)
+
+```bash
+npm run tauri:dev
+```
+
+### Build Production Artifacts
+
+```bash
+npm run build
+npm run tauri:build
+```
+
+## 🧰 Tech Stack
+
+- Frontend: React, Vite, TypeScript, Tailwind CSS
+- Desktop Runtime: Tauri
+- Backend: Node.js, TypeScript, Express, WebSocket
+- Native Performance Layer: C++ addon via node-gyp
+- Systems Layer: Rust (Tauri core)
+
+## 🗂️ Project Structure
+
+```text
+ProtoFlow/
+├── assets/
+├── backend/
+│   ├── native/
+│   ├── src/
+│   │   └── router/
+│   └── test/
+├── public/
+├── src/
+│   ├── components/
+│   ├── data/
+│   ├── hooks/
+│   ├── pages/
+│   └── store/
+├── src-tauri/
+│   ├── capabilities/
+│   ├── gen/
+│   ├── icons/
+│   └── src/
+├── index.html
+├── package.json
+├── README.md
+└── vite.config.ts
+```
+
+## 🤝 Contributing
+
+We welcome contributions from students, maintainers, and open-source collaborators.
+
+### How to Contribute
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit clear, focused changes.
+4. Push your branch and open a Pull Request.
+5. Include relevant screenshots or logs when UI or behavior changes.
+
+### Suggested Workflow
+
+```bash
+git checkout -b feature/your-feature-name
+npm run dev
+git add .
+git commit -m "feat: add your feature"
+git push origin feature/your-feature-name
+```
+
+## 📄 License
+
+Distributed under the MIT License.
+
+See LICENSE for details.
