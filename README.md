@@ -2,9 +2,9 @@
 
 🚀 Multi-protocol traffic intelligence for modern desktop workflows.
 
-![GitHub stars](https://img.shields.io/github/stars/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
-![GitHub issues](https://img.shields.io/github/issues/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
-![GitHub license](https://img.shields.io/github/license/CN-2026-IIITA/ProtoFlow?style=for-the-badge)
+![GitHub stars](https://img.shields.io/github/stars/CN-2026-IIITA/ProtoFlow?style=for-the-badge&cacheSeconds=40)
+![GitHub issues](https://img.shields.io/github/issues/CN-2026-IIITA/ProtoFlow?style=for-the-badge&cacheSeconds=40)
+![GitHub license](https://img.shields.io/github/license/CN-2026-IIITA/ProtoFlow?style=for-the-badge&cacheSeconds=40)
 
 ## 🔍 Preview
 
@@ -45,14 +45,6 @@
 ![ProtoFlow Event Logs](./assets/EventLogs.png)
 
 <p><em>Operational and security events for transparent observability.</em></p>
-
-### Suggested Asset Ideas
-
-- 🖼️ Dashboard overview screenshot: Include system health cards, active route, and latency chart.
-- 🖼️ Protocol analyzer screenshot: Highlight HTTP/2 vs HTTP/3 vs UDP score comparison.
-- 🎞️ Auto-switch demo GIF: Simulate network degradation and show automatic protocol failover.
-- 🎞️ Security logs demo GIF: Scroll and filter events to showcase observability.
-- 🎞️ Settings workflow GIF: Toggle manual override and update optimization rules in real time.
 
 ## ✨ Features
 
