@@ -1,13 +1,16 @@
 import cors from "cors";
 import express from "express";
+import { mkdirSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { WebSocketServer } from "ws";
 import { analyseSnapshot } from "./eventLogger";
 import { Prober } from "./prober";
 import { compareProtocols } from "./protocols";
+import { routeRequest } from "./router/router";
 import { decideBestProtocol } from "./switcher";
 import { ControlState, EventLog, OptimizerSnapshot, ProtocolName } from "./types";
-import { routeRequest } from "./router/router";
 
 const PORT = Number(process.env.BACKEND_PORT ?? 4317);
 
@@ -88,7 +91,10 @@ class OptimizerEngine {
         }
 
         const shouldRecreateProber =
-            patch.mockMode !== undefined || patch.probeHost !== undefined || patch.probePort !== undefined || patch.timeoutMs !== undefined;
+            patch.mockMode !== undefined ||
+            patch.probeHost !== undefined ||
+            patch.probePort !== undefined ||
+            patch.timeoutMs !== undefined;
 
         if (shouldRecreateProber) {
             this.prober = new Prober({
@@ -124,7 +130,7 @@ class OptimizerEngine {
                 this.prober,
                 network,
                 this.latestSnapshot?.protocols,
-                simulationConfig
+                simulationConfig,
             );
             const decision = decideBestProtocol(protocols, network, this.control);
 
@@ -207,7 +213,7 @@ app.get("/config", (_req, res) => {
 
 app.post("/config", (req, res) => {
     const { autoSwitch, preferredProtocol, probeInterval, timeout, turboMode } = req.body;
-    
+
     engine.updateControl({
         mode: autoSwitch ? "auto" : "manual",
         manualProtocol: autoSwitch ? undefined : preferredProtocol,
@@ -253,6 +259,50 @@ app.post("/simulate", (req, res) => {
     res.json({ ok: true, simulationConfig });
 });
 
+app.get("/export-logs", (_req, res) => {
+    try {
+        // Use app directory from Tauri, or OS-specific fallback
+        const fallbackBaseDir =
+            process.platform === "linux"
+                ? join(homedir(), ".config", "ProtoFlow")
+                : process.platform === "win32"
+                  ? join(homedir(), "AppData", "Roaming", "ProtoFlow")
+                  : join(homedir(), "Library", "Application Support", "ProtoFlow");
+
+        const baseDir = process.env.APP_DATA_DIR || fallbackBaseDir;
+        const logsDir = join(baseDir, "logs");
+        mkdirSync(logsDir, { recursive: true });
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+        const filename = `security-logs-${timestamp}.json`;
+        const filepath = join(logsDir, filename);
+
+        // Format logs for export
+        const exportData = {
+            exportedAt: new Date().toISOString(),
+            totalLogs: eventLogs.length,
+            logs: eventLogs,
+        };
+
+        // Write to file
+        writeFileSync(filepath, JSON.stringify(exportData, null, 2));
+
+        res.json({
+            success: true,
+            message: `Logs exported successfully`,
+            filename: filename,
+            path: filepath,
+            logsCount: eventLogs.length,
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
 app.post("/request", async (req, res) => {
     try {
         const { url, method, headers, body } = req.body;
@@ -264,7 +314,7 @@ app.post("/request", async (req, res) => {
             url,
             method: method || "GET",
             headers,
-            body: typeof body === "string" ? body : JSON.stringify(body)
+            body: typeof body === "string" ? body : JSON.stringify(body),
         });
 
         // We can't easily serialize the entire Fetch Response stream back to Express.
@@ -280,7 +330,7 @@ app.post("/request", async (req, res) => {
             latencyMs: responseHeaders["x-router-latency"] || "unknown",
             status: response.status,
             headers: responseHeaders,
-            body: responseText
+            body: responseText,
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -331,7 +381,7 @@ setInterval(() => {
 
 // ---------- START ----------
 server.listen(PORT, () => {
-    console.log(`[server] Dynamic Multi-Protocol Traffic Optimizer backend listening on http://localhost:${PORT}`);
+    console.log(`[server] ProtoFlow backend listening on http://localhost:${PORT}`);
     console.log(`[server] websocket endpoint ws://localhost:${PORT}/ws`);
     engine.start();
 });

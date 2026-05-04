@@ -28,8 +28,19 @@ pub fn run() {
 
             println!("Starting backend from: {:?}", backend_path);
 
+            // Use platform-native app directories while keeping Linux in ~/.config/ProtoFlow
+            let home_dir = app.path().home_dir().expect("failed to get home dir");
+            let app_data_dir = if cfg!(target_os = "linux") {
+                home_dir.join(".config").join("ProtoFlow")
+            } else if cfg!(target_os = "windows") {
+                home_dir.join("AppData").join("Roaming").join("ProtoFlow")
+            } else {
+                home_dir.join("Library").join("Application Support").join("ProtoFlow")
+            };
+
             Command::new("node")
                 .arg(backend_path)
+                .env("APP_DATA_DIR", app_data_dir.to_string_lossy().to_string())
                 .spawn()
                 .expect("failed to start backend");
 
