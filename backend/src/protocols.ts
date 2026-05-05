@@ -3,25 +3,114 @@ import { Prober } from "./prober";
 import { NetworkStats, ProtocolComparison, ProtocolSample } from "./types";
 
 const MIN_THROUGHPUT_FLOOR_MBPS = 0.1;
+const MIN_SUCCESS_THROUGHPUT_MBPS = 1;
+const HTTP3_HANDSHAKE_WEIGHT = 0.45;
+const HTTP3_BASE_THROUGHPUT_FLOOR_MBPS = 12;
+
+const debugThroughput = (...args: unknown[]): void => {
+    if (process.env.DEBUG_THROUGHPUT === "1") {
+        console.debug(...args);
+    }
+};
+
+function withNetworkMeta(sample: ProtocolSample, network: NetworkStats): ProtocolSample {
+    return {
+        ...sample,
+        meta: {
+            ...(sample.meta ?? {}),
+            jitterMs: network.jitterMs,
+            sampleCount: network.sampleCount,
+        },
+    };
+}
+
+function fallbackThroughput(protocol: ProtocolSample["protocol"], network: NetworkStats, latencyMs: number): number {
+    const latency = Math.max(1, latencyMs || network.rttMs || 1);
+    const protocolBase: Record<ProtocolSample["protocol"], number> = {
+        http2: 180,
+        http3: 220,
+        udp: 260,
+    };
+
+    const instability = Math.max(
+        0.25,
+        1 -
+            Math.min(Math.max(network.packetLoss, 0), 1) * (protocol === "udp" ? 1.8 : 1.2) -
+            Math.max(network.jitterMs, 0) * 0.002,
+    );
+
+    return Number(Math.max(MIN_THROUGHPUT_FLOOR_MBPS, (protocolBase[protocol] / latency) * instability).toFixed(2));
+}
+
+function ensureMeaningfulThroughput(sample: ProtocolSample, network: NetworkStats): ProtocolSample {
+    if (!sample.success) {
+        return sample;
+    }
+
+    const current = Number.isFinite(sample.throughputMbps) ? sample.throughputMbps : 0;
+    if (current >= MIN_SUCCESS_THROUGHPUT_MBPS) {
+        return sample;
+    }
+
+    const recoveredThroughput = Math.max(
+        MIN_SUCCESS_THROUGHPUT_MBPS,
+        fallbackThroughput(sample.protocol, network, sample.latencyMs),
+    );
+
+    debugThroughput("[throughput][backend][ensure]", {
+        protocol: sample.protocol,
+        current,
+        recoveredThroughput,
+        latencyMs: sample.latencyMs,
+        rttMs: network.rttMs,
+        jitterMs: network.jitterMs,
+        packetLoss: network.packetLoss,
+    });
+
+    return {
+        ...sample,
+        throughputMbps: recoveredThroughput,
+        meta: {
+            ...(sample.meta ?? {}),
+            throughputSource: "fallback",
+        },
+    };
+}
+
+function ensurePositiveThroughput(sample: ProtocolSample, network: NetworkStats): ProtocolSample {
+    return ensureMeaningfulThroughput(sample, network);
+}
 
 function estimateThroughput(protocol: ProtocolSample["protocol"], network: NetworkStats): number {
     const rtt = Math.max(1, network.rttMs);
     const loss = Math.min(Math.max(network.packetLoss, 0), 1);
+    const jitter = Math.max(0, network.jitterMs);
 
     const baseByProtocol: Record<ProtocolSample["protocol"], number> = {
-        http2: 900,
-        http3: 1100,
-        udp: 1300,
+        http2: 520,
+        http3: 470,
+        udp: 620,
     };
 
     const lossPenaltyByProtocol: Record<ProtocolSample["protocol"], number> = {
-        http2: 1.45,
-        http3: 1.2,
-        udp: 2,
+        http2: 1.65,
+        http3: 1.15,
+        udp: 2.35,
     };
 
-    const estimated =
-        (baseByProtocol[protocol] / (rtt + 12)) * Math.max(0.2, 1 - loss * lossPenaltyByProtocol[protocol]);
+    const jitterPenaltyByProtocol: Record<ProtocolSample["protocol"], number> = {
+        http2: 0.0018,
+        http3: 0.0014,
+        udp: 0.0035,
+    };
+
+    const stabilityFactor = Math.max(
+        0.18,
+        1 - loss * lossPenaltyByProtocol[protocol] - jitter * jitterPenaltyByProtocol[protocol],
+    );
+
+    const latencyPenalty = rtt + 18 + (protocol === "http3" ? 10 : 0);
+    const estimated = (baseByProtocol[protocol] / latencyPenalty) * stabilityFactor;
 
     return Number(Math.max(MIN_THROUGHPUT_FLOOR_MBPS, Math.min(estimated, 1200)).toFixed(2));
 }
@@ -31,19 +120,36 @@ function stabilizeThroughput(
     network: NetworkStats,
     previous?: ProtocolSample,
 ): ProtocolSample {
+    const previousThroughput = previous?.throughputMbps ?? 0;
+
     if (current.success && current.throughputMbps > MIN_THROUGHPUT_FLOOR_MBPS) {
-        return current;
+        if (previousThroughput <= 0) {
+            return current;
+        }
+
+        const blendWeight = current.protocol === "udp" ? 0.7 : current.protocol === "http3" ? 0.75 : 0.82;
+        const blendedThroughput = Number(
+            (current.throughputMbps * blendWeight + previousThroughput * (1 - blendWeight)).toFixed(2),
+        );
+
+        return {
+            ...current,
+            throughputMbps: Math.max(MIN_THROUGHPUT_FLOOR_MBPS, blendedThroughput),
+        };
     }
 
     const estimated = estimateThroughput(current.protocol, network);
-    if (!previous || previous.throughputMbps <= 0) {
+    if (previousThroughput <= 0) {
         return {
             ...current,
             throughputMbps: estimated,
         };
     }
 
-    const blendedThroughput = Number((previous.throughputMbps * 0.55 + estimated * 0.45).toFixed(2));
+    const recoveryWeight = current.protocol === "udp" ? 0.42 : 0.35;
+    const blendedThroughput = Number(
+        (previousThroughput * (1 - recoveryWeight) + estimated * recoveryWeight).toFixed(2),
+    );
 
     return {
         ...current,
@@ -72,30 +178,18 @@ function normalize(metrics: ProtocolSample): ProtocolSample {
         packetLoss: Math.min(Math.max(metrics.packetLoss || 0, 0), 1),
 
         // 100% loss -> no throughput
-        throughputMbps:
-            (metrics.packetLoss || 0) >= 1
-                ? 0
-                : metrics.throughputMbps,
+        throughputMbps: (metrics.packetLoss || 0) >= 1 ? 0 : metrics.throughputMbps,
     };
 }
 
 function applySimulation(real: ProtocolSample, sim?: any): ProtocolSample {
     if (!sim) return normalize(real);
 
-    const latency =
-        sim.latency !== undefined
-            ? sim.latency
-            : real.latencyMs;
+    const latency = sim.latency !== undefined ? sim.latency : real.latencyMs;
 
-    const loss =
-        sim.loss !== undefined
-            ? sim.loss
-            : 0;
+    const loss = sim.loss !== undefined ? sim.loss : 0;
 
-    const jitter =
-        sim.jitter !== undefined
-            ? sim.jitter
-            : (real.meta as any)?.jitterMs ?? 0;
+    const jitter = sim.jitter !== undefined ? sim.jitter : ((real.meta as any)?.jitterMs ?? 0);
 
     const nextMeta = real.meta ? { ...real.meta } : {};
     nextMeta.jitterMs = jitter;
@@ -166,7 +260,18 @@ export async function benchmarkHttp2(urlRaw: string, timeoutMs = 2500): Promise<
             const measuredBytes = Math.max(bytes, contentLengthBytes);
             const measuredThroughputMbps = (measuredBytes * 8) / (elapsedMs / 1000) / 1_000_000;
             const fallbackThroughputMbps = Math.max(1, 500 / elapsedMs);
-            const throughputMbps = measuredBytes > 0 ? measuredThroughputMbps : fallbackThroughputMbps;
+            const throughputMbps = Math.max(
+                MIN_SUCCESS_THROUGHPUT_MBPS,
+                measuredBytes > 0 ? measuredThroughputMbps : fallbackThroughputMbps,
+            );
+
+            debugThroughput("[throughput][backend][http2]", {
+                measuredBytes,
+                elapsedMs,
+                measuredThroughputMbps,
+                fallbackThroughputMbps,
+                throughputMbps,
+            });
 
             client.close();
             resolve({
@@ -188,7 +293,7 @@ export async function compareProtocols(
     prober: Prober,
     network: NetworkStats,
     previous?: ProtocolComparison,
-    simulationConfig?: any
+    simulationConfig?: any,
 ): Promise<ProtocolComparison> {
     const [http2, http3Result, udpResult] = await Promise.all([
         benchmarkHttp2(targetUrl),
@@ -200,7 +305,11 @@ export async function compareProtocols(
         ? {
               protocol: "http3",
               latencyMs: Math.max(1, http3Result.latencyMs),
-              throughputMbps: Math.max(15, 1200 / Math.max(1, http3Result.latencyMs)),
+              throughputMbps: Math.max(
+                  MIN_SUCCESS_THROUGHPUT_MBPS,
+                  HTTP3_BASE_THROUGHPUT_FLOOR_MBPS,
+                  900 / Math.max(1, http3Result.latencyMs + http3Result.handshakeMs * HTTP3_HANDSHAKE_WEIGHT),
+              ),
               packetLoss: 0,
               success: true,
               meta: { handshakeMs: http3Result.handshakeMs },
@@ -210,7 +319,7 @@ export async function compareProtocols(
     const udpCandidate: ProtocolSample = {
         protocol: "udp",
         latencyMs: Math.max(1, udpResult.latencyMs),
-        throughputMbps: Math.max(udpResult.throughputMbps, MIN_THROUGHPUT_FLOOR_MBPS),
+        throughputMbps: Math.max(udpResult.throughputMbps, MIN_SUCCESS_THROUGHPUT_MBPS),
         packetLoss: udpResult.packetLoss,
         success: udpResult.success,
         error: udpResult.error,
@@ -225,9 +334,36 @@ export async function compareProtocols(
     const stabilizedHttp3 = stabilizeThroughput(http3Candidate, network, previous?.http3);
     const stabilizedUdp = stabilizeThroughput(udpCandidate, network, previous?.udp);
 
+    debugThroughput("[throughput][backend][compare]", {
+        http2: stabilizedHttp2.throughputMbps,
+        http3: stabilizedHttp3.throughputMbps,
+        udp: stabilizedUdp.throughputMbps,
+    });
+
     return {
-        http2: applySimulation(stabilizedHttp2, simulationConfig),
-        http3: applySimulation(stabilizedHttp3, simulationConfig),
-        udp: applySimulation(stabilizedUdp, simulationConfig),
+        http2: ensurePositiveThroughput(
+            applySimulation(withNetworkMeta(stabilizedHttp2, network), simulationConfig),
+            network,
+        ),
+        http3: ensurePositiveThroughput(
+            applySimulation(withNetworkMeta(stabilizedHttp3, network), simulationConfig),
+            network,
+        ),
+        udp: ensurePositiveThroughput(
+            applySimulation(
+                withNetworkMeta(
+                    {
+                        ...stabilizedUdp,
+                        meta: {
+                            ...(stabilizedUdp.meta ?? {}),
+                            jitterMs: Math.max(network.jitterMs, (stabilizedUdp.meta as any)?.jitterMs ?? 0),
+                        },
+                    },
+                    network,
+                ),
+                simulationConfig,
+            ),
+            network,
+        ),
     };
 }

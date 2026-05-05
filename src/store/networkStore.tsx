@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:4317
 const SOCKET_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:4317/ws";
 const MAX_HISTORY = 50;
 const MAX_CHART_POINTS = 50;
+const MIN_SUCCESS_THROUGHPUT_MBPS = 1;
 
 type ProtocolName = "http2" | "http3" | "udp";
 
@@ -121,7 +122,16 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asNumber(value: unknown, fallback = 0): number {
-    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    return fallback;
 }
 
 function asString(value: unknown, fallback = ""): string {
@@ -140,6 +150,12 @@ function asMode(value: unknown): ControlMode {
     return value === "manual" ? "manual" : "auto";
 }
 
+function debugThroughput(...args: unknown[]): void {
+    if (import.meta.env.VITE_DEBUG_THROUGHPUT === "1") {
+        console.debug(...args);
+    }
+}
+
 function parseSnapshot(raw: unknown): Snapshot | null {
     if (!isObjectRecord(raw)) {
         return null;
@@ -156,12 +172,32 @@ function parseSnapshot(raw: unknown): Snapshot | null {
 
     const parseProtocolSample = (sample: unknown, protocol: ProtocolName): ProtocolSample => {
         const payload = isObjectRecord(sample) ? sample : {};
+        const latencyMs = asNumber(payload.latencyMs, 0);
+        const success = asBoolean(payload.success, false);
+        const rawThroughput = asNumber(payload.throughputMbps, Number.NaN);
+        const fallbackThroughput = Math.max(
+            MIN_SUCCESS_THROUGHPUT_MBPS,
+            latencyMs > 0 ? 500 / Math.max(1, latencyMs) : 1,
+        );
+        const throughputMbps =
+            success && (!Number.isFinite(rawThroughput) || rawThroughput <= 0)
+                ? fallbackThroughput
+                : Math.max(0, Number.isFinite(rawThroughput) ? rawThroughput : 0);
+
+        debugThroughput("[throughput][frontend][parse]", {
+            protocol,
+            latencyMs,
+            success,
+            rawThroughput,
+            throughputMbps,
+        });
+
         return {
             protocol,
-            latencyMs: asNumber(payload.latencyMs, 0),
-            throughputMbps: asNumber(payload.throughputMbps, 0),
+            latencyMs,
+            throughputMbps,
             packetLoss: asNumber(payload.packetLoss, 1),
-            success: asBoolean(payload.success, false),
+            success,
             error: asString(payload.error, "") || undefined,
         };
     };
@@ -227,6 +263,13 @@ export const NetworkStoreProvider = ({ children }: { children: ReactNode }) => {
 
     const applySnapshot = useCallback((snapshot: Snapshot) => {
         const activeThroughput = snapshot.protocols[snapshot.decision.bestProtocol].throughputMbps;
+        debugThroughput("[throughput][frontend][snapshot]", {
+            bestProtocol: snapshot.decision.bestProtocol,
+            throughput: activeThroughput,
+            http2: snapshot.protocols.http2.throughputMbps,
+            http3: snapshot.protocols.http3.throughputMbps,
+            udp: snapshot.protocols.udp.throughputMbps,
+        });
 
         setMetrics(prev => {
             if (

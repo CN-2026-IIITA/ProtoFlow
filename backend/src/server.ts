@@ -14,6 +14,12 @@ import { ControlState, EventLog, OptimizerSnapshot, ProtocolName } from "./types
 
 const PORT = Number(process.env.BACKEND_PORT ?? 4317);
 
+function debugThroughput(...args: unknown[]): void {
+    if (process.env.DEBUG_THROUGHPUT === "1") {
+        console.debug(...args);
+    }
+}
+
 class OptimizerEngine {
     private control: ControlState;
     private prober: Prober;
@@ -141,6 +147,13 @@ class OptimizerEngine {
                 decision,
                 control: this.getControlState(),
             };
+
+            debugThroughput("[throughput][backend][snapshot]", {
+                http2: snapshot.protocols.http2.throughputMbps,
+                http3: snapshot.protocols.http3.throughputMbps,
+                udp: snapshot.protocols.udp.throughputMbps,
+                bestProtocol: snapshot.decision.bestProtocol,
+            });
 
             this.latestSnapshot = snapshot;
 

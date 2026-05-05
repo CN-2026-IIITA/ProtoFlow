@@ -47,6 +47,12 @@ function tryLoadNativeBinding(): NativeBinding | null {
     return null;
 }
 
+function debugThroughput(...args: unknown[]): void {
+    if (process.env.DEBUG_THROUGHPUT === "1") {
+        console.debug(...args);
+    }
+}
+
 export class Prober {
     private readonly binding: NativeBinding | null;
     private readonly options: ProberOptions;
@@ -68,6 +74,8 @@ export class Prober {
                 samples: 8,
                 timeoutMs: this.options.timeoutMs ?? 800,
             });
+
+            debugThroughput("[throughput][native][network]", result);
 
             return {
                 timestamp: Date.now(),
@@ -92,6 +100,7 @@ export class Prober {
     async http3Request(url: string): Promise<Http3ProbeResult> {
         if (this.binding) {
             const result = this.binding.http3Request({ url, timeoutMs: this.options.timeoutMs ?? 2000 });
+            debugThroughput("[throughput][native][http3]", result);
             return {
                 latencyMs: result.latency,
                 handshakeMs: result.handshake,
@@ -117,6 +126,8 @@ export class Prober {
                 payloadBytes: 64,
                 timeoutMs: this.options.timeoutMs ?? 800,
             });
+
+            debugThroughput("[throughput][native][udp]", result);
 
             return {
                 latencyMs: result.latency,

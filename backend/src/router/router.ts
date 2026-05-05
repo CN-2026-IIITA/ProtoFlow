@@ -1,4 +1,5 @@
 import { engine } from "../server";
+import { OptimizerSnapshot, ProtocolName } from "../types";
 import { requestHttp2, RouteRequestOptions } from "./http2Client";
 import { requestHttp3 } from "./http3Client";
 import { requestUdp } from "./udpClient";
@@ -15,37 +16,62 @@ export async function routeRequest(options: RouteRequestOptions): Promise<Respon
         logRequest(bestProtocol, false, "error");
         console.warn(`[router] ${bestProtocol} failed: ${error.message}. Attempting fallback...`);
 
-        // Fallback Logic
-        if (bestProtocol === "http3") {
+        const fallbackOrder = buildFallbackOrder(snapshot, bestProtocol);
+
+        for (const fallbackProtocol of fallbackOrder) {
             try {
-                const fallbackResponse = await executeWithProtocol("http2", options);
-                logRequest("http2", true, fallbackResponse.headers.get("x-router-latency") || "unknown", "fallback");
+                const fallbackResponse = await executeWithProtocol(fallbackProtocol, options);
+                logRequest(
+                    fallbackProtocol,
+                    true,
+                    fallbackResponse.headers.get("x-router-latency") || "unknown",
+                    "fallback",
+                );
                 return fallbackResponse;
             } catch (fallbackErr: any) {
-                logRequest("http2", false, "error", "fallback");
-                throw fallbackErr;
-            }
-        }
-
-        if (bestProtocol === "udp") {
-            try {
-                const fallbackResponse = await executeWithProtocol("http3", options);
-                logRequest("http3", true, fallbackResponse.headers.get("x-router-latency") || "unknown", "fallback");
-                return fallbackResponse;
-            } catch (fallbackErr) {
-                try {
-                    const fallbackResponse2 = await executeWithProtocol("http2", options);
-                    logRequest("http2", true, fallbackResponse2.headers.get("x-router-latency") || "unknown", "fallback-2");
-                    return fallbackResponse2;
-                } catch (fallbackErr2: any) {
-                    logRequest("http2", false, "error", "fallback-2");
-                    throw fallbackErr2;
-                }
+                logRequest(fallbackProtocol, false, "error", "fallback");
             }
         }
 
         throw error;
     }
+}
+
+function buildFallbackOrder(snapshot: OptimizerSnapshot | null, failedProtocol: ProtocolName): ProtocolName[] {
+    if (!snapshot) {
+        return failedProtocol === "http2" ? ["http3", "udp"] : ["http2", "http3"];
+    }
+
+    const fallbackProtocols: ProtocolName[] = [];
+    const realtime = snapshot.control.trafficType === "realtime";
+
+    if (failedProtocol !== "http2" && snapshot.protocols.http2.success) {
+        fallbackProtocols.push("http2");
+    }
+
+    if (failedProtocol === "http2") {
+        if (snapshot.protocols.http3.success) {
+            fallbackProtocols.push("http3");
+        }
+        if (realtime && snapshot.protocols.udp.success) {
+            fallbackProtocols.push("udp");
+        }
+        return fallbackProtocols;
+    }
+
+    if (failedProtocol === "http3") {
+        if (realtime && snapshot.protocols.udp.success) {
+            fallbackProtocols.push("udp");
+        }
+        return fallbackProtocols;
+    }
+
+    // UDP is the least reliable option, so it should fall back to the dependable transport first.
+    if (snapshot.protocols.http3.success) {
+        fallbackProtocols.push("http3");
+    }
+
+    return fallbackProtocols;
 }
 
 async function executeWithProtocol(protocol: string, options: RouteRequestOptions): Promise<Response> {

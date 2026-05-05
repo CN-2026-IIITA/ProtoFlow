@@ -1,5 +1,5 @@
 import { Activity, AlertCircle, ChevronRight, Timer, Zap } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useNetworkStore } from "../store/networkStore";
 
@@ -8,6 +8,11 @@ const protocolLabel = {
     http3: "HTTP/3",
     udp: "UDP",
 } as const;
+
+function formatThroughput(sampleThroughput: number | null | undefined, success: boolean | undefined): number {
+    const value = typeof sampleThroughput === "number" && Number.isFinite(sampleThroughput) ? sampleThroughput : 0;
+    return success ? Math.max(1, value) : value;
+}
 
 export const Dashboard = () => {
     const {
@@ -36,14 +41,25 @@ export const Dashboard = () => {
 
     const latencyMs = metrics?.rttMs ?? 0;
     const packetLossPercent = (metrics?.packetLoss ?? 0) * 100;
-    const throughputMbps = decision && protocols ? protocols[decision.bestProtocol].throughputMbps : 0;
+    const activeSample = decision && protocols ? protocols[decision.bestProtocol] : null;
+    const throughputMbps = formatThroughput(activeSample?.throughputMbps, activeSample?.success);
     const activeProtocolName = decision ? `${protocolLabel[decision.bestProtocol]} Adaptive` : "Pending";
     const activeProtocolDetail = decision?.reason ?? "Waiting for backend decision stream";
+
+    useEffect(() => {
+        if (import.meta.env.VITE_DEBUG_THROUGHPUT === "1") {
+            console.debug("[throughput][ui][dashboard]", {
+                throughputMbps,
+                protocol: decision?.bestProtocol,
+                success: activeSample?.success,
+            });
+        }
+    }, [throughputMbps, decision?.bestProtocol, activeSample?.success]);
 
     const orderedSwitches = [...switchHistory].reverse();
 
     return (
-        <div className="w-full max-w-[1400px] mx-auto p-8 lg:p-12">
+        <div className="w-full max-w-350 mx-auto p-8 lg:p-12">
             {(isLoading || error) && (
                 <div
                     className={`mb-6 rounded-2xl border px-6 lg:px-10 py-3 text-xs font-bold uppercase tracking-widest ${
@@ -211,7 +227,7 @@ export const Dashboard = () => {
                                             className="sr-only peer"
                                             type="checkbox"
                                         />
-                                        <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                                     </label>
                                     <span className="font-display font-bold">
                                         {(control?.mode ?? "auto") === "auto" ? "Auto Mode" : "Manual Mode"}
@@ -254,7 +270,7 @@ export const Dashboard = () => {
                         <h2 className="text-xl font-bold font-display mb-1">Switch Log</h2>
                         <p className="text-xs text-on-surface-variant">Automated protocol transition history</p>
                     </div>
-                    <div className="p-8 space-y-8 overflow-y-auto max-h-[500px]">
+                    <div className="p-8 space-y-8 overflow-y-auto max-h-125">
                         {orderedSwitches.length === 0 && (
                             <div className="text-xs text-on-surface-variant uppercase tracking-widest">
                                 Waiting for protocol transitions...
@@ -281,9 +297,7 @@ export const Dashboard = () => {
                                     key={index}
                                     className={`relative pl-6 border-l-2 ${borderColor} group hover:pl-7 transition-all`}
                                 >
-                                    <div
-                                        className={`absolute -left-[7px] top-0 w-3 h-3 rounded-full ${dotColor}`}
-                                    ></div>
+                                    <div className={`absolute -left-1.75 top-0 w-3 h-3 rounded-full ${dotColor}`}></div>
                                     <p className={`text-[10px] ${timeColor} font-bold mb-1`}>
                                         {new Date(log.timestamp).toLocaleTimeString()}
                                     </p>
