@@ -18,9 +18,6 @@ export async function requestUdp(options: RouteRequestOptions): Promise<Response
             if (completed) return;
             completed = true;
             client.close();
-            // Since we are simulating, a timeout on receive is normal 
-            // if the remote server doesn't respond to raw UDP datagrams.
-            // We resolve a synthesized response.
             resolveSimulatedResponse(host, port, start, true);
         }, timeoutMs);
 

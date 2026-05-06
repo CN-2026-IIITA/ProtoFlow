@@ -3,11 +3,6 @@ import { RouteRequestOptions } from "./http2Client";
 
 export async function requestHttp3(options: RouteRequestOptions): Promise<Response> {
     const prober = engine.getProber();
-    
-    // We utilize the existing native HTTP/3 QUIC addon.
-    // The addon returns success/latency but not body headers yet.
-    // We synthesize a Response to fulfill the router interface.
-    
     const start = performance.now();
     const result = await prober.http3Request(options.url);
     const latencyMs = Math.max(1, performance.now() - start);
